@@ -1,0 +1,18 @@
+# date personale: NICIODATA in repo
+*.csv
+*.xlsx
+*.json
+!package.json
+data/
+import/
+
+# secrete
+.env
+.env.*
+supabase/.temp/
+supabase/.env
+
+# sistem
+.DS_Store
+Thumbs.db
+node_modules/
