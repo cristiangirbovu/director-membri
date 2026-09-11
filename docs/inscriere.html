@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Înscriere</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="invelis ingust">
+
+  <header class="bara">
+    <a class="marca" href="index.html">Director de colegi</a>
+    <nav>
+      <a href="inscriere.html" class="activ">Înscriere</a>
+      <a href="director.html">Intră</a>
+    </nav>
+  </header>
+
+  <h1>Înscriere</h1>
+  <p class="slab">Sub două minute. Datele din prima secțiune le comparăm cu lista publică
+  a autorizațiilor. Restul sunt pentru colegii care te caută.</p>
+
+  <div id="mesaj" class="mesaj" hidden></div>
+
+  <form id="f" class="card" novalidate>
+
+    <div class="sectiune" style="margin-top:0;padding-top:0;border:0">
+      <h2>1. Date din autorizație</h2>
+      <p class="slab mic">Scrie-le așa cum apar pe autorizația ta.</p>
+    </div>
+
+    <label class="camp">
+      <span>Numele tău <b class="obl">*</b></span>
+      <input type="text" name="nume" required autocomplete="name" maxlength="120">
+      <span class="ajutor">Exemplu: Popescu Mihaela. Nu contează ordinea nume/prenume.</span>
+    </label>
+
+    <label class="camp">
+      <span>Numărul autorizației <b class="obl">*</b></span>
+      <input type="text" name="numar_autorizatie" required inputmode="numeric" maxlength="30">
+      <span class="ajutor">Doar numărul, fără an. Exemplu: 8422</span>
+    </label>
+
+    <div class="camp">
+      <span class="legenda">Limbile pentru care ești autorizat <b class="obl">*</b></span>
+      <span class="ajutor" style="margin:0 0 8px">Bifează exact denumirile care apar pe autorizația ta.</span>
+      <div class="bife" id="limbi"></div>
+    </div>
+
+    <div class="sectiune">
+      <h2>2. Unde te găsim</h2>
+      <p class="slab mic">Datele de contact nu devin publice automat. Decizi tu la final.</p>
+    </div>
+
+    <label class="camp">
+      <span>Județ <b class="obl">*</b></span>
+      <select name="judet" required><option value="">Alege</option></select>
+    </label>
+
+    <label class="camp">
+      <span>Localitate <b class="obl">*</b></span>
+      <input type="text" name="localitate" required autocomplete="address-level2" maxlength="80">
+    </label>
+
+    <label class="camp">
+      <span>Email <b class="obl">*</b></span>
+      <input type="email" name="email" required autocomplete="email" maxlength="120">
+      <span class="ajutor">Aici primești rezultatul și linkul de acces.</span>
+    </label>
+
+    <label class="camp">
+      <span>Telefon <b class="obl">*</b></span>
+      <input type="tel" name="telefon" required autocomplete="tel" maxlength="30">
+    </label>
+
+    <label class="camp">
+      <span>Nume firmă</span>
+      <input type="text" name="firma" maxlength="120">
+      <span class="ajutor">Opțional. Dacă lucrezi prin PFA, SRL sau birou de traduceri.</span>
+    </label>
+
+    <label class="camp">
+      <span>Site</span>
+      <input type="text" name="site" maxlength="120" placeholder="exemplu.ro">
+      <span class="ajutor">Opțional.</span>
+    </label>
+
+    <div class="sectiune">
+      <h2>3. Acordul tău</h2>
+      <p class="slab mic">Două acorduri distincte. Poți accepta primul fără al doilea.</p>
+    </div>
+
+    <div class="camp">
+      <label class="acord">
+        <input type="checkbox" name="consimtamant" required>
+        <span>Am citit <a href="confidentialitate.html" target="_blank">nota de informare</a> și sunt
+        de acord cu prelucrarea datelor mele pentru verificare și pentru administrarea directorului. <b class="obl">*</b></span>
+      </label>
+    </div>
+
+    <div class="camp radio">
+      <span class="legenda">Cum vrei să apari în director? <b class="obl">*</b></span>
+      <label><input type="radio" name="afisare" value="public" required>
+        <span>Da, datele mele pot apărea în director</span></label>
+      <label><input type="radio" name="afisare" value="fara_telefon">
+        <span>Da, dar fără telefon</span></label>
+      <label><input type="radio" name="afisare" value="intern">
+        <span>Nu, vreau doar să pot căuta, fără să apar</span></label>
+    </div>
+
+    <div class="actiuni">
+      <button class="btn" type="submit" id="trimite">Trimite înscrierea</button>
+    </div>
+  </form>
+
+  <div id="rezultat" hidden></div>
+
+  <footer>
+    Director ținut de <strong>[[NUME OPERATOR]]</strong> · <a href="mailto:[[EMAIL]]">[[EMAIL]]</a><br>
+    <a href="confidentialitate.html">Cum folosim datele tale</a>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // liste
+  var bife = $('limbi');
+  LIMBI.forEach(function (l) {
+    var lab = el('label');
+    var cb = el('input'); cb.type = 'checkbox'; cb.name = 'limbi'; cb.value = l;
+    lab.appendChild(cb); lab.appendChild(el('span', null, l));
+    bife.appendChild(lab);
+  });
+  var sel = document.querySelector('select[name=judet]');
+  JUDETE.forEach(function (j) { var o = el('option', null, j); o.value = j; sel.appendChild(o); });
+
+  var f = $('f'), btn = $('trimite');
+
+  f.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    ascundeMesaj();
+
+    var fd = new FormData(f);
+    var date = {
+      nume: fd.get('nume'),
+      numar_autorizatie: fd.get('numar_autorizatie'),
+      limbi: fd.getAll('limbi'),
+      judet: fd.get('judet'),
+      localitate: fd.get('localitate'),
+      email: fd.get('email'),
+      telefon: fd.get('telefon'),
+      firma: fd.get('firma'),
+      site: fd.get('site'),
+      consimtamant_prelucrare: fd.get('consimtamant') === 'on',
+      afisare: fd.get('afisare')
+    };
+
+    // verificari minime in browser; cele reale sunt pe server
+    var lipsa = [];
+    if (!date.nume || date.nume.trim().length < 3) lipsa.push('numele');
+    if (!date.numar_autorizatie) lipsa.push('numărul autorizației');
+    if (!date.limbi.length) lipsa.push('cel puțin o limbă');
+    if (!date.judet) lipsa.push('județul');
+    if (!date.localitate) lipsa.push('localitatea');
+    if (!date.email) lipsa.push('emailul');
+    if (!date.telefon) lipsa.push('telefonul');
+    if (!date.consimtamant_prelucrare) lipsa.push('acordul pentru prelucrarea datelor');
+    if (!date.afisare) lipsa.push('cum vrei să apari');
+    if (lipsa.length) { mesaj('rau', 'Mai lipsește ceva', 'Completează: ' + lipsa.join(', ') + '.'); return; }
+
+    btn.disabled = true; btn.textContent = 'Se verifică...';
+    try {
+      var r = await sb.functions.invoke('inscriere', { body: date });
+      if (r.error) {
+        var corp = null;
+        try { corp = await r.error.context.json(); } catch (e) {}
+        mesaj('rau', 'Nu am putut înregistra', (corp && corp.eroare) || 'Încearcă din nou peste un minut.');
+        return;
+      }
+      arataRezultat(r.data, date.email);
+    } catch (e) {
+      mesaj('rau', 'Nu am putut înregistra', 'Verifică conexiunea și încearcă din nou.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Trimite înscrierea';
+    }
+  });
+
+  function arataRezultat(r, email) {
+    f.hidden = true;
+    var z = $('rezultat'); z.textContent = ''; z.hidden = false;
+    var c = el('div', 'card');
+    if (r.verdict === 'acceptat') {
+      c.appendChild(el('h2', null, 'Ești înscris.')).style.marginTop = 0;
+      c.appendChild(el('p', null, 'Datele tale se potrivesc cu lista publică a autorizațiilor' +
+        (r.mj_nume ? ' (' + r.mj_nume + ')' : '') + '.'));
+      c.appendChild(el('p', null, 'Ca să intri în director, cere un link de acces pe ' + email + '. ' +
+        'Nu există parolă: de fiecare dată intri prin linkul primit pe email.'));
+      var a = el('a', 'btn', 'Intră în director'); a.href = 'director.html'; c.appendChild(a);
+    } else if (r.verdict === 'de_verificat') {
+      c.appendChild(el('h2', null, 'Am primit înscrierea. Mai avem nevoie de o verificare.')).style.marginTop = 0;
+      c.appendChild(el('p', null, r.motiv));
+      c.appendChild(el('p', 'slab', 'De cele mai multe ori e vorba de o autorizație recentă, de o schimbare de nume, ' +
+        'sau de o greșeală de tastare. Un coleg se uită și te contactează pe ' + email + '.'));
+    } else {
+      c.appendChild(el('h2', null, 'Nu am putut confirma înscrierea.')).style.marginTop = 0;
+      c.appendChild(el('p', null, r.motiv));
+      c.appendChild(el('p', 'slab', 'Dacă ești autorizat și crezi că e o greșeală, scrie-ne și lămurim împreună.'));
+    }
+    z.appendChild(c);
+    z.scrollIntoView({ behavior: 'smooth' });
+  }
+})();
+</script>
+</body>
+</html>

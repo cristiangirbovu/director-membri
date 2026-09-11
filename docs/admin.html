@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administrare</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="invelis">
+
+  <header class="bara">
+    <a class="marca" href="index.html">Director de colegi</a>
+    <nav>
+      <a href="director.html">Director</a>
+      <a href="admin.html" class="activ">Administrare</a>
+      <a href="#" id="iesire" hidden>Ieși</a>
+    </nav>
+  </header>
+
+  <div id="mesaj" class="mesaj" hidden></div>
+
+  <section id="s-login" hidden class="ingust">
+    <h1>Administrare</h1>
+    <p class="slab">Intră cu adresa de administrator. Primești un link pe email.</p>
+    <form id="f-login" class="card" novalidate>
+      <label class="camp"><span>Email</span><input type="email" name="email" required autocomplete="email"></label>
+      <div class="actiuni" style="margin-top:8px"><button class="btn" type="submit" id="b-login">Trimite-mi linkul</button></div>
+    </form>
+  </section>
+
+  <section id="s-trimis" hidden class="ingust">
+    <h1>Verifică emailul</h1>
+    <div class="card"><p>Ți-am trimis un link de acces pe <strong id="email-trimis"></strong>.</p></div>
+  </section>
+
+  <section id="s-refuz" hidden class="ingust">
+    <h1>Acces refuzat</h1>
+    <div class="card"><p>Contul cu care ești conectat nu este administrator.</p></div>
+  </section>
+
+  <section id="s-admin" hidden>
+    <h1>Administrare</h1>
+    <p class="slab mic" id="salut"></p>
+
+    <div class="file">
+      <button data-fila="de_verificat" class="activ">De verificat <span id="n-verif"></span></button>
+      <button data-fila="acceptat">Membri <span id="n-acc"></span></button>
+      <button data-fila="respins">Respinși <span id="n-resp"></span></button>
+      <button data-fila="export">Export</button>
+    </div>
+
+    <div id="fila-lista">
+      <label class="camp" style="max-width:420px"><span>Caută</span>
+        <input type="search" id="cauta" placeholder="nume, email, autorizație" autocomplete="off"></label>
+      <div class="tabel-invelis"><table><thead><tr>
+        <th>Înscris</th><th>Nume</th><th>Autorizație</th><th>Limbi</th><th>Contact</th><th>Verificare</th><th>Stare</th><th></th>
+      </tr></thead><tbody id="tbody"></tbody></table></div>
+    </div>
+
+    <div id="fila-export" hidden>
+      <div class="card">
+        <p>Descarcă toți membrii ca fișier CSV, cu toate câmpurile. Se deschide în Excel.</p>
+        <p class="slab mic">Conține date personale. Păstrează-l doar cât ai nevoie.</p>
+        <button class="btn" id="b-export">Descarcă CSV</button>
+      </div>
+    </div>
+  </section>
+
+  <footer><a href="confidentialitate.html">Cum folosim datele</a></footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  'use strict';
+  var S = { login: $('s-login'), trimis: $('s-trimis'), refuz: $('s-refuz'), admin: $('s-admin') };
+  function arata(n) { Object.keys(S).forEach(function (k) { S[k].hidden = (k !== n); }); }
+  $('iesire').addEventListener('click', function (e) { e.preventDefault(); deconectare(); });
+
+  $('f-login').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var email = new FormData(ev.target).get('email').trim().toLowerCase();
+    if (!email) return;
+    $('b-login').disabled = true;
+    var r = await trimiteLink(email, 'admin.html');
+    $('b-login').disabled = false;
+    if (r.error) { mesaj('rau', 'Nu a mers', 'Adresa nu are cont sau linkul nu a putut fi trimis.'); return; }
+    $('email-trimis').textContent = email; arata('trimis');
+  });
+
+  var TOT = [], fila = 'de_verificat';
+  var ETIC = { acceptat: 'acceptat', de_verificat: 'de verificat', respins: 'respins' };
+
+  (async function () {
+    var eu = await cineSunt();
+    if (!eu) { arata('login'); return; }
+    $('iesire').hidden = false;
+    if (!eu.admin) { arata('refuz'); return; }
+    var s = await sesiune();
+    $('salut').textContent = 'Conectat ca ' + (s.user.email || '') + '.';
+    arata('admin');
+    await incarca();
+  })();
+
+  async function incarca() {
+    var r = await sb.rpc('admin_lista');
+    if (r.error) { mesaj('rau', 'Nu am putut încărca lista', r.error.message); return; }
+    TOT = r.data || [];
+    $('n-verif').textContent = '(' + TOT.filter(function (m) { return m.verdict === 'de_verificat' && m.stare === 'activ'; }).length + ')';
+    $('n-acc').textContent   = '(' + TOT.filter(function (m) { return m.verdict === 'acceptat'; }).length + ')';
+    $('n-resp').textContent  = '(' + TOT.filter(function (m) { return m.verdict === 'respins'; }).length + ')';
+    deseneaza();
+  }
+
+  document.querySelectorAll('.file button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.file button').forEach(function (x) { x.classList.remove('activ'); });
+      b.classList.add('activ'); fila = b.dataset.fila;
+      $('fila-lista').hidden = (fila === 'export'); $('fila-export').hidden = (fila !== 'export');
+      deseneaza();
+    });
+  });
+  $('cauta').addEventListener('input', deseneaza);
+
+  function deseneaza() {
+    if (fila === 'export') return;
+    var q = faraDiacritice($('cauta').value.trim());
+    var tb = $('tbody'); tb.textContent = '';
+    TOT.filter(function (m) { return m.verdict === fila; })
+       .filter(function (m) { return !q || faraDiacritice([m.nume, m.email, m.numar_autorizatie, m.mj_nume].join(' ')).indexOf(q) !== -1; })
+       .forEach(function (m) { tb.appendChild(rand(m)); });
+    if (!tb.children.length) { var tr = el('tr'); var td = el('td', 'slab', 'Nimic aici.'); td.colSpan = 8; tr.appendChild(td); tb.appendChild(tr); }
+  }
+
+  function rand(m) {
+    var tr = el('tr');
+    tr.appendChild(el('td', null, dataScurta(m.creat_la)));
+    var tdN = el('td'); tdN.appendChild(el('strong', null, m.nume));
+    if (m.mj_nume && m.mj_nume !== m.nume) { tdN.appendChild(el('br')); tdN.appendChild(el('span', 'slab mic', 'MJ: ' + m.mj_nume)); }
+    tr.appendChild(tdN);
+    tr.appendChild(el('td', null, m.numar_autorizatie));
+    var tdL = el('td', null, (m.limbi || []).join(', '));
+    if (m.mj_limbi && m.mj_limbi !== (m.limbi || []).join(', ')) { tdL.appendChild(el('br')); tdL.appendChild(el('span', 'slab mic', 'MJ: ' + m.mj_limbi)); }
+    tr.appendChild(tdL);
+    var tdC = el('td'); tdC.appendChild(el('div', null, m.email)); if (m.telefon) tdC.appendChild(el('div', 'slab', m.telefon)); tr.appendChild(tdC);
+    var tdV = el('td'); tdV.appendChild(el('span', 'eticheta ' + m.verdict, ETIC[m.verdict])); if (m.motiv) { tdV.appendChild(el('br')); tdV.appendChild(el('span', 'slab mic', m.motiv)); } tr.appendChild(tdV);
+    tr.appendChild(el('td', null, m.stare === 'activ' ? 'activ' : m.stare));
+    var tdA = el('td'); tdA.style.whiteSpace = 'nowrap';
+    if (m.verdict === 'de_verificat') {
+      tdA.appendChild(buton('Acceptă', 'ok', function () { decide(m, 'acceptat'); }));
+      tdA.appendChild(document.createTextNode(' '));
+      tdA.appendChild(buton('Respinge', 'rau', function () { decide(m, 'respins'); }));
+    } else if (m.verdict === 'acceptat') {
+      tdA.appendChild(buton(m.stare === 'activ' ? 'Dezactivează' : 'Reactivează', 'secundar', function () { stare(m, m.stare === 'activ' ? 'inactiv' : 'activ'); }));
+      tdA.appendChild(document.createTextNode(' '));
+      tdA.appendChild(buton('Șterge', 'secundar', function () { if (confirm('Ștergi definitiv înscrierea lui ' + m.nume + '?')) stare(m, 'sters'); }));
+    } else if (m.verdict === 'respins') {
+      tdA.appendChild(buton('Acceptă totuși', 'ok', function () { decide(m, 'acceptat'); }));
+    }
+    tr.appendChild(tdA);
+    return tr;
+  }
+  function buton(text, clasa, fn) { var b = el('button', 'btn mic ' + clasa, text); b.type = 'button'; b.addEventListener('click', fn); return b; }
+
+  async function decide(m, v) {
+    var r = await sb.rpc('admin_decide', { p_id: m.id, p_verdict: v, p_motiv: 'Decis manual de administrator.' });
+    if (r.error) { mesaj('rau', 'Nu a mers', r.error.message); return; }
+    mesaj('ok', (v === 'acceptat' ? 'Acceptat' : 'Respins') + ': ' + m.nume, v === 'acceptat' ? 'Poate intra în director de acum.' : '');
+    await incarca();
+  }
+  async function stare(m, s) {
+    var r = await sb.rpc('admin_stare', { p_id: m.id, p_stare: s });
+    if (r.error) { mesaj('rau', 'Nu a mers', r.error.message); return; }
+    mesaj('ok', 'Actualizat: ' + m.nume, 'Stare: ' + s + '.');
+    await incarca();
+  }
+
+  $('b-export').addEventListener('click', function () {
+    var cap = ['Inscris', 'Nume', 'Autorizatie', 'Limbi', 'Judet', 'Localitate', 'Email', 'Telefon', 'Firma', 'Site', 'Afisare', 'Verdict', 'Motiv', 'MJ nume', 'MJ limbi', 'Stare', 'Confirmat'];
+    var esc = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    var linii = [cap].concat(TOT.map(function (m) { return [dataScurta(m.creat_la), m.nume, m.numar_autorizatie, (m.limbi || []).join('; '), m.judet, m.localitate, m.email, m.telefon, m.firma, m.site, m.afisare, m.verdict, m.motiv, m.mj_nume, m.mj_limbi, m.stare, dataScurta(m.confirmat_la)]; }));
+    var csv = '﻿' + linii.map(function (r) { return r.map(esc).join(','); }).join('\r\n');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'membri-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+})();
+</script>
+</body>
+</html>

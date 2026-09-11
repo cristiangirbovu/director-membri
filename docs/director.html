@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Director</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="invelis">
+
+  <header class="bara">
+    <a class="marca" href="index.html">Director de colegi</a>
+    <nav>
+      <a href="inscriere.html">Înscriere</a>
+      <a href="director.html" class="activ">Director</a>
+      <a href="admin.html" id="nav-admin" hidden>Administrare</a>
+      <a href="#" id="iesire" hidden>Ieși</a>
+    </nav>
+  </header>
+
+  <div id="mesaj" class="mesaj" hidden></div>
+
+  <!-- 1. neconectat: cere link -->
+  <section id="s-login" hidden class="ingust">
+    <h1>Intră în director</h1>
+    <p class="slab">Fără parolă. Scrie adresa cu care te-ai înscris și primești un link pe email.</p>
+    <form id="f-login" class="card" novalidate>
+      <label class="camp">
+        <span>Email</span>
+        <input type="email" name="email" required autocomplete="email">
+      </label>
+      <div class="actiuni" style="margin-top:8px">
+        <button class="btn" type="submit" id="b-login">Trimite-mi linkul</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 2. link trimis -->
+  <section id="s-trimis" hidden class="ingust">
+    <h1>Verifică emailul</h1>
+    <div class="card">
+      <p>Ți-am trimis un link de acces pe <strong id="email-trimis"></strong>.</p>
+      <p class="slab">Deschide-l de pe același dispozitiv. Dacă nu apare în câteva minute, verifică
+      folderul de spam. Linkul e valabil o oră.</p>
+    </div>
+  </section>
+
+  <!-- 3. conectat dar nu membru acceptat -->
+  <section id="s-asteptare" hidden class="ingust">
+    <h1 id="asteptare-titlu"></h1>
+    <div class="card"><p id="asteptare-text"></p></div>
+  </section>
+
+  <!-- 4. directorul -->
+  <section id="s-director" hidden>
+    <h1>Directorul</h1>
+    <p class="slab">Colegi verificați. <span id="total"></span></p>
+    <p class="slab mic" id="salut" hidden></p>
+
+    <div class="filtre">
+      <div class="randuri">
+        <label class="camp"><span>Limbă</span>
+          <select id="f-limba"><option value="">Toate limbile</option></select></label>
+        <label class="camp"><span>Județ</span>
+          <select id="f-judet"><option value="">Toate județele</option></select></label>
+        <label class="camp"><span>Caută</span>
+          <input type="search" id="f-text" placeholder="nume, oraș, firmă" autocomplete="off"></label>
+      </div>
+      <div class="bara-jos">
+        <span class="numar" id="numar"></span>
+        <button class="reset" id="reset" hidden>Șterge filtrele</button>
+      </div>
+    </div>
+
+    <div class="rezultate" id="rezultate"></div>
+  </section>
+
+  <footer>
+    Fiecare membru s-a înscris singur și își reconfirmă prezența anual. Data de pe fișă arată
+    ultima confirmare. Datele de contact apar doar în măsura în care fiecare a ales să fie vizibil.<br>
+    <a href="confidentialitate.html">Cum folosim datele tale</a>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var S = { login: $('s-login'), trimis: $('s-trimis'), asteptare: $('s-asteptare'), director: $('s-director') };
+  function arata(nume) { Object.keys(S).forEach(function (k) { S[k].hidden = (k !== nume); }); }
+
+  $('iesire').addEventListener('click', function (e) { e.preventDefault(); deconectare(); });
+
+  // ------------------------------------------------------------ conectare
+  $('f-login').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var email = new FormData(ev.target).get('email').trim().toLowerCase();
+    if (!email) return;
+    var b = $('b-login'); b.disabled = true;
+    var r = await trimiteLink(email, 'director.html');
+    b.disabled = false;
+    if (r.error) {
+      var m = /signup|not allowed|Signups/i.test(r.error.message)
+        ? 'Adresa asta nu este înscrisă. Verifică dacă e cea folosită la înscriere.'
+        : 'Nu am putut trimite linkul. Încearcă din nou peste un minut.';
+      mesaj('rau', 'Nu a mers', m);
+      return;
+    }
+    $('email-trimis').textContent = email;
+    arata('trimis');
+  });
+
+  // --------------------------------------------------------------- pornire
+  (async function () {
+    var eu = await cineSunt();
+    if (!eu) { arata('login'); return; }
+
+    $('iesire').hidden = false;
+    if (eu.admin) $('nav-admin').hidden = false;
+
+    if (!eu.membru) {
+      var t = $('asteptare-titlu'), x = $('asteptare-text');
+      if (eu.verdict === 'de_verificat') {
+        t.textContent = 'Înscrierea ta e în verificare.';
+        x.textContent = 'Un coleg se uită peste datele tale și te contactează. Până atunci, directorul nu e încă disponibil.';
+      } else if (eu.verdict === 'respins') {
+        t.textContent = 'Înscrierea nu a putut fi confirmată.';
+        x.textContent = 'Dacă ești autorizat și crezi că e o greșeală, scrie-ne și lămurim împreună.';
+      } else if (eu.admin) {
+        t.textContent = 'Ești administrator, nu membru.';
+        x.textContent = 'Directorul e vizibil doar membrilor înscriși. Panoul de administrare e în meniu.';
+      } else {
+        t.textContent = 'Contul tău nu e activ.';
+        x.textContent = 'Dacă ai cerut ștergerea sau nu ai reconfirmat prezența, scrie-ne ca să te reactivăm.';
+      }
+      arata('asteptare');
+      return;
+    }
+
+    var r = await sb.rpc('director');
+    if (r.error) { mesaj('rau', 'Nu am putut încărca directorul', 'Încearcă din nou peste un minut.'); arata('director'); return; }
+    if (eu.nume) { $('salut').textContent = 'Conectat ca ' + eu.nume + '.'; $('salut').hidden = false; }
+    porneste(r.data || []);
+    arata('director');
+  })();
+
+  // ---------------------------------------------------------------- director
+  function porneste(DATE) {
+    var elLimba = $('f-limba'), elJudet = $('f-judet'), elText = $('f-text');
+    var elRez = $('rezultate'), elNumar = $('numar'), elReset = $('reset');
+
+    var nrLimbi = {};
+    DATE.forEach(function (m) { (m.limbi || []).forEach(function (l) { if (l) nrLimbi[l] = (nrLimbi[l] || 0) + 1; }); });
+    Object.keys(nrLimbi).sort(function (a, b) { return nrLimbi[b] - nrLimbi[a] || a.localeCompare(b, 'ro'); })
+      .forEach(function (v) { var o = el('option', null, v); o.value = v; elLimba.appendChild(o); });
+    var jud = {};
+    DATE.forEach(function (m) { if (m.judet) jud[m.judet] = 1; });
+    Object.keys(jud).sort(function (a, b) { return a.localeCompare(b, 'ro'); })
+      .forEach(function (v) { var o = el('option', null, v); o.value = v; elJudet.appendChild(o); });
+
+    $('total').textContent = DATE.length ? DATE.length + ' membri.' : '';
+
+    function potrivit(m, f) {
+      if (f.limba && (m.limbi || []).indexOf(f.limba) === -1) return false;
+      if (f.judet && m.judet !== f.judet) return false;
+      if (f.text) {
+        var hai = faraDiacritice([m.nume, m.judet, m.localitate, m.firma, m.site, (m.limbi || []).join(' ')].join(' '));
+        if (hai.indexOf(faraDiacritice(f.text)) === -1) return false;
+      }
+      return true;
+    }
+
+    function fisa(m) {
+      var f = el('article', 'fisa');
+      f.appendChild(el('h2', 'nume', m.nume));
+      f.appendChild(el('p', 'limbi', (m.limbi || []).join(' · ')));
+      var loc = [m.localitate, m.judet].filter(Boolean).join(', ');
+      if (loc) f.appendChild(el('p', 'loc', loc));
+      if (m.firma) f.appendChild(el('p', 'firma', m.firma));
+      if (m.confirmat_la) f.appendChild(el('p', 'membru', 'Confirmat ' + luna(m.confirmat_la)));
+      var c = el('div', 'contact');
+      if (m.email) { var a = el('a', null, m.email); a.href = 'mailto:' + m.email; c.appendChild(a); }
+      if (m.telefon) { var t = el('a', null, m.telefon); t.href = 'tel:' + String(m.telefon).replace(/\s/g, ''); c.appendChild(t); }
+      if (m.site) {
+        var u = String(m.site).trim(); var w = el('a', null, u.replace(/^https?:\/\//i, ''));
+        w.href = /^https?:\/\//i.test(u) ? u : 'https://' + u; w.target = '_blank'; w.rel = 'noopener noreferrer';
+        c.appendChild(w);
+      }
+      if (!m.email && !m.telefon && !m.site) c.appendChild(el('span', 'fara', 'Fără date de contact publice'));
+      f.appendChild(c);
+      return f;
+    }
+
+    function deseneaza() {
+      var f = { limba: elLimba.value, judet: elJudet.value, text: elText.value.trim() };
+      var lista = DATE.filter(function (m) { return potrivit(m, f); });
+      elRez.textContent = '';
+      if (!lista.length) {
+        var g = el('div', 'gol');
+        g.appendChild(el('strong', null, 'Niciun rezultat'));
+        g.appendChild(el('span', null, 'Încearcă fără unul dintre filtre, sau caută altfel numele.'));
+        elRez.appendChild(g);
+      } else lista.forEach(function (m) { elRez.appendChild(fisa(m)); });
+      elNumar.innerHTML = '<b>' + lista.length + '</b> ' + (lista.length === 1 ? 'rezultat' : 'rezultate');
+      elReset.hidden = !(f.limba || f.judet || f.text);
+    }
+    [elLimba, elJudet].forEach(function (e) { e.addEventListener('change', deseneaza); });
+    elText.addEventListener('input', deseneaza);
+    elReset.addEventListener('click', function () { elLimba.value = elJudet.value = elText.value = ''; deseneaza(); });
+    deseneaza();
+  }
+})();
+</script>
+</body>
+</html>
