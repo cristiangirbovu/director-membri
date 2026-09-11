@@ -80,3 +80,14 @@ for (let i = 0; i < rows.length; i += Math.floor(rows.length / 2000)) {
   v.verdict === 'ACCEPTAT' ? acc++ : v.verdict === 'DE VERIFICAT' ? ver++ : res++;
 }
 console.log(`  ACCEPTAT ${acc}  DE VERIFICAT ${ver}  RESPINS ${res}`);
+
+console.log('\n--- VARIANTE DE DIACRITICE (trebuie toate acceptate si canonice) ---');
+for (const [l, j] of [['Engleza', 'Bucuresti'], ['ENGLEZĂ', 'BUCUREŞTI'], ['Engleză'.normalize('NFD'), 'București'.normalize('NFD')]]) {
+  const v = valideaza({ nume: 'Cojocaru Daniela', numar_autorizatie: '1010', limbi: [l], judet: j,
+    localitate: 'X', email: 'a@b.ro', consimtamant_prelucrare: true, afisare: 'public' });
+  const ok = v.erori.length === 0 && v.date?.limbi[0] === 'Engleză' && v.date?.judet === 'București';
+  console.log((ok ? '  OK   ' : '  PICA ') + JSON.stringify(l) + ' / ' + JSON.stringify(j) + ' -> ' + (v.date ? v.date.limbi[0] + ' / ' + v.date.judet : v.erori.join(' ')));
+}
+const vx = valideaza({ nume: 'Cojocaru Daniela', numar_autorizatie: '1010', limbi: ['Klingoniană'], judet: 'Atlantida',
+  localitate: 'X', email: 'a@b.ro', consimtamant_prelucrare: true, afisare: 'public' });
+console.log((vx.erori.length === 2 ? '  OK   ' : '  PICA ') + 'limba si judet inexistente -> ' + vx.erori.join(' '));

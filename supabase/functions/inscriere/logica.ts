@@ -199,7 +199,15 @@ export interface Inscriere {
 }
 
 const curat = (v: unknown, max = 200): string =>
-  String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
+  String(v == null ? '' : v).normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, max);
+
+// Gaseste eticheta canonica dintr-o lista, comparand fara diacritice si fara
+// majuscule. Asa 'Engleza', 'ENGLEZĂ' si 'Engleză' cu ă descompus ajung toate
+// la 'Engleză', exact cum e in lista. Intoarce '' daca nu exista.
+function canonic(valoare: string, lista: string[]): string {
+  const n = normNume(valoare);
+  return n ? (lista.find((x) => normNume(x) === n) ?? '') : '';
+}
 
 /** Curata si valideaza ce vine din browser. Intoarce datele curate sau lista de erori. */
 export function valideaza(brut: unknown): { date?: Inscriere; erori: string[] } {
@@ -209,8 +217,8 @@ export function valideaza(brut: unknown): { date?: Inscriere; erori: string[] } 
   const d: Inscriere = {
     nume:              curat(b.nume, 120),
     numar_autorizatie: curat(b.numar_autorizatie, 30),
-    limbi:             Array.isArray(b.limbi) ? b.limbi.map((l) => curat(l, 40)).filter(Boolean) : [],
-    judet:             curat(b.judet, 40),
+    limbi:             Array.isArray(b.limbi) ? b.limbi.map((l) => canonic(curat(l, 40), LIMBI)).filter(Boolean) : [],
+    judet:             canonic(curat(b.judet, 40), JUDETE),
     localitate:        curat(b.localitate, 80),
     email:             curat(b.email, 120).toLowerCase(),
     telefon:           curat(b.telefon, 30),
@@ -222,9 +230,10 @@ export function valideaza(brut: unknown): { date?: Inscriere; erori: string[] } 
 
   if (d.nume.length < 3)                       erori.push('Numele lipsește.');
   if (!normAutorizatie(d.numar_autorizatie))   erori.push('Numărul autorizației lipsește sau nu e valid.');
+  const nrLimbiTrimise = Array.isArray(b.limbi) ? b.limbi.filter(Boolean).length : 0;
   if (!d.limbi.length)                         erori.push('Alege cel puțin o limbă.');
-  if (d.limbi.some((l) => !LIMBI.includes(l))) erori.push('O limbă nu este din listă.');
-  if (!JUDETE.includes(d.judet))               erori.push('Județul nu este valid.');
+  else if (d.limbi.length < nrLimbiTrimise)    erori.push('O limbă nu este din listă.');
+  if (!d.judet)                                erori.push('Județul nu este valid.');
   if (d.localitate.length < 2)                 erori.push('Localitatea lipsește.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) erori.push('Adresa de email nu este validă.');
   if (!d.consimtamant_prelucrare)              erori.push('Acordul pentru prelucrarea datelor este necesar.');
