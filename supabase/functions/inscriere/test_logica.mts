@@ -3,7 +3,7 @@
 // Ruleaza aceleasi cazuri ca testul original din Apps Script.
 
 import { readFileSync } from 'node:fs';
-import { evalueaza, cheieNume, normAutorizatie, valideaza, type Candidat } from './index.ts';
+import { evalueaza, cheieNume, normAutorizatie, valideaza, type Candidat } from './logica.ts';
 
 const CSV = '../../../../microsoft/MJ_referinta_completa.csv';
 const rows: Candidat[] = [];

@@ -2,9 +2,9 @@
 // Face o citire minima din baza, ca proiectul sa nu intre in pauza pe planul
 // gratuit. Apelata de un monitor extern (UptimeRobot) la cateva ore.
 // Nu cere autentificare, nu intoarce date personale.
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 Deno.serve(async () => {
-  const { createClient } = await import('npm:@supabase/supabase-js@2');
   const sb = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
