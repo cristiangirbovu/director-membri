@@ -25,7 +25,11 @@
     <p class="slab">Intră cu adresa de administrator. Primești un link pe email.</p>
     <form id="f-login" class="card" novalidate>
       <label class="camp"><span>Email</span><input type="email" name="email" required autocomplete="email"></label>
-      <div class="actiuni" style="margin-top:8px"><button class="btn" type="submit" id="b-login">Trimite-mi linkul</button></div>
+      <label class="camp"><span>Parolă</span><input type="password" name="parola" autocomplete="current-password">
+        <span class="ajutor">Opțional. Doar administratorii au parolă. Fără ea, primești link pe email.</span></label>
+      <div class="actiuni" style="margin-top:8px">
+        <button class="btn" type="submit" id="b-login">Intră</button>
+      </div>
     </form>
   </section>
 
@@ -82,12 +86,30 @@
 
   $('f-login').addEventListener('submit', async function (ev) {
     ev.preventDefault();
-    var email = new FormData(ev.target).get('email').trim().toLowerCase();
+    var fd = new FormData(ev.target);
+    var email = String(fd.get('email') || '').trim().toLowerCase();
+    var parola = String(fd.get('parola') || '');
     if (!email) return;
     $('b-login').disabled = true;
+
+    // Cu parola: intrare directa, fara email. Fara parola: link magic.
+    if (parola) {
+      var p = await sb.auth.signInWithPassword({ email: email, password: parola });
+      $('b-login').disabled = false;
+      if (p.error) { mesaj('rau', 'Nu a mers', 'Email sau parolă greșită.'); return; }
+      window.location.reload();
+      return;
+    }
+
     var r = await trimiteLink(email, 'admin.html');
     $('b-login').disabled = false;
-    if (r.error) { mesaj('rau', 'Nu a mers', 'Adresa nu are cont sau linkul nu a putut fi trimis.'); return; }
+    if (r.error) {
+      var lim = /rate limit|too many/i.test(r.error.message);
+      mesaj('rau', 'Nu a mers', lim
+        ? 'Prea multe linkuri cerute în ultima oră. Așteaptă puțin, sau intră cu parola dacă ai una.'
+        : 'Adresa nu are cont sau linkul nu a putut fi trimis.');
+      return;
+    }
     $('email-trimis').textContent = email; arata('trimis');
   });
 
