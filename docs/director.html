@@ -24,15 +24,21 @@
   <!-- 1. neconectat: cere link -->
   <section id="s-login" hidden class="ingust">
     <h1>Intră în director</h1>
-    <p class="slab">Fără parolă. Scrie adresa cu care te-ai înscris și primești un link pe email.</p>
+    <p class="slab">Cu emailul și parola de la înscriere. Sau cere un link pe email, dacă preferi.</p>
     <form id="f-login" class="card" novalidate>
       <label class="camp">
         <span>Email</span>
         <input type="email" name="email" required autocomplete="email">
       </label>
+      <label class="camp">
+        <span>Parolă</span>
+        <input type="password" name="parola" autocomplete="current-password">
+      </label>
       <div class="actiuni" style="margin-top:8px">
-        <button class="btn" type="submit" id="b-login">Trimite-mi linkul</button>
+        <button class="btn" type="submit">Intră</button>
+        <button class="btn secundar" type="button" data-actiune="link">Trimite-mi un link pe email</button>
       </div>
+      <p class="mic" style="margin:16px 0 0"><a href="#" data-actiune="reset">Am uitat parola</a></p>
     </form>
   </section>
 
@@ -97,20 +103,7 @@
   $('iesire').addEventListener('click', function (e) { e.preventDefault(); deconectare(); });
 
   // ------------------------------------------------------------ conectare
-  $('f-login').addEventListener('submit', async function (ev) {
-    ev.preventDefault();
-    var email = new FormData(ev.target).get('email').trim().toLowerCase();
-    if (!email) return;
-    var b = $('b-login'); b.disabled = true;
-    var r = await trimiteLink(email, 'director.html');
-    b.disabled = false;
-    if (r.error) {
-      var m = /signup|not allowed|Signups/i.test(r.error.message)
-        ? 'Adresa asta nu este înscrisă. Verifică dacă e cea folosită la înscriere.'
-        : 'Nu am putut trimite linkul. Încearcă din nou peste un minut.';
-      mesaj('rau', 'Nu a mers', m);
-      return;
-    }
+  legareConectare($('f-login'), 'director.html', function (email) {
     $('email-trimis').textContent = email;
     arata('trimis');
   });

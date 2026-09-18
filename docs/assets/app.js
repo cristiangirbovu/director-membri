@@ -78,6 +78,67 @@
     return sb.auth.signInWithOtp({ email: email, options: { emailRedirectTo: url } });
   };
 
+  // Leaga un formular de conectare cu trei actiuni:
+  //   submit                 -> intrare cu email + parola
+  //   [data-actiune=link]    -> link magic pe email
+  //   [data-actiune=reset]   -> email de resetare a parolei, care duce la parola-noua.html
+  // Formularul trebuie sa aiba input[name=email] si input[name=parola].
+  // laTrimis(email) e apelat cand a plecat un email; laIntrat() cand s-a conectat.
+  window.legareConectare = function (form, paginaInapoi, laTrimis, laIntrat) {
+    var emailDin = function () {
+      return String(new FormData(form).get('email') || '').trim().toLowerCase();
+    };
+    var ocupat = function (da) {
+      form.querySelectorAll('button').forEach(function (b) { b.disabled = da; });
+    };
+    var explica = function (err, ceIncerc) {
+      var m = String(err && err.message || '');
+      if (/signup|not allowed/i.test(m))    return 'Adresa asta nu este înscrisă. Verifică dacă e cea folosită la înscriere.';
+      if (/rate limit|too many/i.test(m))   return 'Prea multe emailuri cerute în ultima oră. Așteaptă puțin, sau intră cu parola.';
+      if (/invalid login|credentials/i.test(m)) return 'Email sau parolă greșită.';
+      return ceIncerc + ' nu a mers. Încearcă din nou peste un minut.';
+    };
+
+    form.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      ascundeMesaj();
+      var email = emailDin(), parola = String(new FormData(form).get('parola') || '');
+      if (!email) { mesaj('rau', 'Lipsește emailul', ''); return; }
+      if (!parola) { mesaj('atentie', 'Scrie parola', 'Sau apasă „Trimite-mi un link pe email" ca să intri fără ea.'); return; }
+      ocupat(true);
+      var r = await sb.auth.signInWithPassword({ email: email, password: parola });
+      ocupat(false);
+      if (r.error) { mesaj('rau', 'Nu a mers', explica(r.error, 'Conectarea')); return; }
+      if (laIntrat) laIntrat(); else window.location.reload();
+    });
+
+    var bLink = form.querySelector('[data-actiune=link]');
+    if (bLink) bLink.addEventListener('click', async function () {
+      ascundeMesaj();
+      var email = emailDin();
+      if (!email) { mesaj('rau', 'Lipsește emailul', ''); return; }
+      ocupat(true);
+      var r = await trimiteLink(email, paginaInapoi);
+      ocupat(false);
+      if (r.error) { mesaj('rau', 'Nu a mers', explica(r.error, 'Trimiterea linkului')); return; }
+      if (laTrimis) laTrimis(email);
+    });
+
+    var bReset = form.querySelector('[data-actiune=reset]');
+    if (bReset) bReset.addEventListener('click', async function (ev) {
+      ev.preventDefault();
+      ascundeMesaj();
+      var email = emailDin();
+      if (!email) { mesaj('rau', 'Scrie întâi emailul', 'Apoi apasă din nou pe „Am uitat parola".'); return; }
+      ocupat(true);
+      var url = new URL('parola-noua.html', window.location.href).href;
+      var r = await sb.auth.resetPasswordForEmail(email, { redirectTo: url });
+      ocupat(false);
+      if (r.error) { mesaj('rau', 'Nu a mers', explica(r.error, 'Trimiterea emailului')); return; }
+      mesaj('info', 'Verifică emailul', 'Ți-am trimis pe ' + email + ' un link prin care îți alegi o parolă nouă. Valabil o oră.');
+    });
+  };
+
   var LUNI = ['ian.', 'feb.', 'mar.', 'apr.', 'mai', 'iun.', 'iul.', 'aug.', 'sept.', 'oct.', 'nov.', 'dec.'];
   window.luna = function (iso) {
     if (!iso) return '';

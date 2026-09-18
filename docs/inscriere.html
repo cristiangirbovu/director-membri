@@ -87,7 +87,23 @@
     </label>
 
     <div class="sectiune">
-      <h2>3. Acordul tău</h2>
+      <h2>3. Parola ta</h2>
+      <p class="slab mic">Cu ea intri în director. Dacă o uiți, o resetezi prin email.</p>
+    </div>
+
+    <label class="camp">
+      <span>Parolă <b class="obl">*</b></span>
+      <input type="password" name="parola" required autocomplete="new-password" minlength="8" maxlength="72">
+      <span class="ajutor">Cel puțin 8 caractere.</span>
+    </label>
+
+    <label class="camp">
+      <span>Repetă parola <b class="obl">*</b></span>
+      <input type="password" name="parola2" required autocomplete="new-password" minlength="8" maxlength="72">
+    </label>
+
+    <div class="sectiune">
+      <h2>4. Acordul tău</h2>
       <p class="slab mic">Două acorduri distincte. Poți accepta primul fără al doilea.</p>
     </div>
 
@@ -159,8 +175,10 @@
       firma: fd.get('firma'),
       site: fd.get('site'),
       consimtamant_prelucrare: fd.get('consimtamant') === 'on',
-      afisare: fd.get('afisare')
+      afisare: fd.get('afisare'),
+      parola: String(fd.get('parola') || '')
     };
+    var parola2 = String(fd.get('parola2') || '');
 
     // verificari minime in browser; cele reale sunt pe server
     var lipsa = [];
@@ -171,9 +189,12 @@
     if (!date.localitate) lipsa.push('localitatea');
     if (!date.email) lipsa.push('emailul');
     if (!date.telefon) lipsa.push('telefonul');
+    if (!date.parola) lipsa.push('parola');
     if (!date.consimtamant_prelucrare) lipsa.push('acordul pentru prelucrarea datelor');
     if (!date.afisare) lipsa.push('cum vrei să apari');
     if (lipsa.length) { mesaj('rau', 'Mai lipsește ceva', 'Completează: ' + lipsa.join(', ') + '.'); return; }
+    if (date.parola.length < 8) { mesaj('rau', 'Parola e prea scurtă', 'Cel puțin 8 caractere.'); return; }
+    if (date.parola !== parola2) { mesaj('rau', 'Parolele nu coincid', 'Scrie aceeași parolă în ambele câmpuri.'); return; }
 
     btn.disabled = true; btn.textContent = 'Se verifică...';
     try {
@@ -200,8 +221,8 @@
       c.appendChild(el('h2', null, 'Ești înscris.')).style.marginTop = 0;
       c.appendChild(el('p', null, 'Datele tale se potrivesc cu lista publică a autorizațiilor' +
         (r.mj_nume ? ' (' + r.mj_nume + ')' : '') + '.'));
-      c.appendChild(el('p', null, 'Ca să intri în director, cere un link de acces pe ' + email + '. ' +
-        'Nu există parolă: de fiecare dată intri prin linkul primit pe email.'));
+      c.appendChild(el('p', null, 'Intri în director cu ' + email + ' și parola pe care tocmai ai ales-o. ' +
+        'Dacă o uiți, o poți reseta prin email.'));
       var a = el('a', 'btn', 'Intră în director'); a.href = 'director.html'; c.appendChild(a);
     } else if (r.verdict === 'de_verificat') {
       c.appendChild(el('h2', null, 'Am primit înscrierea. Mai avem nevoie de o verificare.')).style.marginTop = 0;

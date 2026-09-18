@@ -77,7 +77,7 @@ p  { margin: 0 0 12px; }
 }
 .camp .ajutor { display: block; font-size: 13px; color: var(--text-slab); font-weight: 400; margin: 4px 0 0; }
 .camp .obl { color: var(--rau); font-weight: 600; }
-input[type=text], input[type=email], input[type=tel], input[type=url], input[type=search], select, textarea {
+input[type=text], input[type=email], input[type=tel], input[type=url], input[type=search], input[type=password], select, textarea {
   width: 100%; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--text);
   background: var(--card); border: 1px solid var(--linie); border-radius: 8px; appearance: none;
 }

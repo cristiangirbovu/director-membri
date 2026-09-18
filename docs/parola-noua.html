@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parolă nouă</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="invelis ingust">
+
+  <header class="bara">
+    <a class="marca" href="index.html">Director de colegi</a>
+    <nav><a href="director.html">Director</a></nav>
+  </header>
+
+  <div id="mesaj" class="mesaj" hidden></div>
+
+  <section id="s-form" hidden>
+    <h1>Alege o parolă nouă</h1>
+    <form id="f" class="card" novalidate>
+      <label class="camp">
+        <span>Parolă nouă</span>
+        <input type="password" name="parola" required autocomplete="new-password" minlength="8" maxlength="72">
+        <span class="ajutor">Cel puțin 8 caractere.</span>
+      </label>
+      <label class="camp">
+        <span>Repetă parola</span>
+        <input type="password" name="parola2" required autocomplete="new-password" minlength="8" maxlength="72">
+      </label>
+      <div class="actiuni" style="margin-top:8px">
+        <button class="btn" type="submit" id="b">Salvează parola</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="s-gata" hidden>
+    <h1>Parola a fost schimbată.</h1>
+    <div class="card">
+      <p>De acum intri cu ea.</p>
+      <a class="btn" href="director.html">Intră în director</a>
+    </div>
+  </section>
+
+  <section id="s-nevalid" hidden>
+    <h1>Linkul nu mai e valabil.</h1>
+    <div class="card">
+      <p>Linkurile de resetare sunt valabile o oră și se folosesc o singură dată.</p>
+      <p>Cere unul nou din pagina de intrare, cu „Am uitat parola".</p>
+      <a class="btn secundar" href="director.html">Înapoi la intrare</a>
+    </div>
+  </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  'use strict';
+  var S = { form: $('s-form'), gata: $('s-gata'), nevalid: $('s-nevalid') };
+  function arata(n) { Object.keys(S).forEach(function (k) { S[k].hidden = (k !== n); }); }
+
+  // Linkul din email deschide pagina cu o sesiune de recuperare in URL.
+  // supabase-js o preia singur; noi doar asteptam sa apara.
+  var gasit = false;
+  sb.auth.onAuthStateChange(function (ev, sesiune) {
+    if (sesiune && !gasit) { gasit = true; arata('form'); }
+  });
+  setTimeout(async function () {
+    if (gasit) return;
+    var s = await sesiune();
+    if (s) { gasit = true; arata('form'); } else arata('nevalid');
+  }, 1500);
+
+  $('f').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    ascundeMesaj();
+    var fd = new FormData(ev.target);
+    var p1 = String(fd.get('parola') || ''), p2 = String(fd.get('parola2') || '');
+    if (p1.length < 8) { mesaj('rau', 'Parola e prea scurtă', 'Cel puțin 8 caractere.'); return; }
+    if (p1 !== p2) { mesaj('rau', 'Parolele nu coincid', ''); return; }
+    $('b').disabled = true;
+    var r = await sb.auth.updateUser({ password: p1 });
+    $('b').disabled = false;
+    if (r.error) { mesaj('rau', 'Nu a mers', 'Linkul a expirat sau parola nu a putut fi salvată. Cere un link nou.'); return; }
+    arata('gata');
+  });
+})();
+</script>
+</body>
+</html>

@@ -195,6 +195,7 @@ interface Inscriere {
   site?: string;
   consimtamant_prelucrare: boolean;
   afisare: string;
+  parola: string;
 }
 
 const curat = (v: unknown, max = 200): string =>
@@ -225,6 +226,8 @@ function valideaza(brut: unknown): { date?: Inscriere; erori: string[] } {
     site:              curat(b.site, 120),
     consimtamant_prelucrare: b.consimtamant_prelucrare === true,
     afisare:           curat(b.afisare, 20),
+    // parola NU trece prin curat(): spatiile si lungimea sunt ale ei
+    parola:            typeof b.parola === 'string' ? b.parola : '',
   };
 
   if (d.nume.length < 3)                       erori.push('Numele lipsește.');
@@ -237,6 +240,8 @@ function valideaza(brut: unknown): { date?: Inscriere; erori: string[] } {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) erori.push('Adresa de email nu este validă.');
   if (!d.consimtamant_prelucrare)              erori.push('Acordul pentru prelucrarea datelor este necesar.');
   if (!AFISARI.includes(d.afisare))            erori.push('Alege cum vrei să apari în director.');
+  if (d.parola.length < 8)                     erori.push('Parola trebuie să aibă cel puțin 8 caractere.');
+  if (d.parola.length > 72)                    erori.push('Parola e prea lungă.');
 
   return erori.length ? { erori } : { date: d, erori: [] };
 }
@@ -312,18 +317,21 @@ export async function handler(req: Request): Promise<Response> {
     (cN.data || []).map(mapeaza),
   );
 
-  // 3. Contul de autentificare. Fara parola: omul intra prin link pe email.
-  //    Se creeaza pentru toti; accesul la director e decis de verdict.
+  // 3. Contul de autentificare, cu parola aleasa de om. Poate intra cu ea
+  //    sau, alternativ, cu link pe email. Se creeaza pentru toti; accesul la
+  //    director e decis de verdict.
   let userId: string | null = null;
   const { data: u, error: eU } = await sb.auth.admin.createUser({
-    email: d.email, email_confirm: true,
+    email: d.email, password: d.parola, email_confirm: true,
   });
   if (!eU && u?.user) {
     userId = u.user.id;
   } else {
-    // Adresa exista deja in auth (ramasa de la o inscriere stearsa). O cautam.
+    // Adresa exista deja in auth (ramasa de la o inscriere stearsa).
+    // O cautam si ii punem parola noua, ca omul sa poata intra.
     const { data: lst } = await sb.auth.admin.listUsers({ page: 1, perPage: 1000 });
     userId = lst?.users?.find((x) => (x.email || '').toLowerCase() === d.email)?.id ?? null;
+    if (userId) await sb.auth.admin.updateUserById(userId, { password: d.parola });
   }
 
   // 4. Salvam inscrierea cu verdictul.

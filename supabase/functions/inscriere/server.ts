@@ -70,18 +70,21 @@ export async function handler(req: Request): Promise<Response> {
     (cN.data || []).map(mapeaza),
   );
 
-  // 3. Contul de autentificare. Fara parola: omul intra prin link pe email.
-  //    Se creeaza pentru toti; accesul la director e decis de verdict.
+  // 3. Contul de autentificare, cu parola aleasa de om. Poate intra cu ea
+  //    sau, alternativ, cu link pe email. Se creeaza pentru toti; accesul la
+  //    director e decis de verdict.
   let userId: string | null = null;
   const { data: u, error: eU } = await sb.auth.admin.createUser({
-    email: d.email, email_confirm: true,
+    email: d.email, password: d.parola, email_confirm: true,
   });
   if (!eU && u?.user) {
     userId = u.user.id;
   } else {
-    // Adresa exista deja in auth (ramasa de la o inscriere stearsa). O cautam.
+    // Adresa exista deja in auth (ramasa de la o inscriere stearsa).
+    // O cautam si ii punem parola noua, ca omul sa poata intra.
     const { data: lst } = await sb.auth.admin.listUsers({ page: 1, perPage: 1000 });
     userId = lst?.users?.find((x) => (x.email || '').toLowerCase() === d.email)?.id ?? null;
+    if (userId) await sb.auth.admin.updateUserById(userId, { password: d.parola });
   }
 
   // 4. Salvam inscrierea cu verdictul.

@@ -196,6 +196,7 @@ export interface Inscriere {
   site?: string;
   consimtamant_prelucrare: boolean;
   afisare: string;
+  parola: string;
 }
 
 const curat = (v: unknown, max = 200): string =>
@@ -226,6 +227,8 @@ export function valideaza(brut: unknown): { date?: Inscriere; erori: string[] } 
     site:              curat(b.site, 120),
     consimtamant_prelucrare: b.consimtamant_prelucrare === true,
     afisare:           curat(b.afisare, 20),
+    // parola NU trece prin curat(): spatiile si lungimea sunt ale ei
+    parola:            typeof b.parola === 'string' ? b.parola : '',
   };
 
   if (d.nume.length < 3)                       erori.push('Numele lipsește.');
@@ -238,6 +241,8 @@ export function valideaza(brut: unknown): { date?: Inscriere; erori: string[] } 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) erori.push('Adresa de email nu este validă.');
   if (!d.consimtamant_prelucrare)              erori.push('Acordul pentru prelucrarea datelor este necesar.');
   if (!AFISARI.includes(d.afisare))            erori.push('Alege cum vrei să apari în director.');
+  if (d.parola.length < 8)                     erori.push('Parola trebuie să aibă cel puțin 8 caractere.');
+  if (d.parola.length > 72)                    erori.push('Parola e prea lungă.');
 
   return erori.length ? { erori } : { date: d, erori: [] };
 }

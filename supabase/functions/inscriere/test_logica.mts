@@ -60,12 +60,12 @@ T('numar lipsa, nume necunoscut',    { nume: 'Qwerty Zxcvbn Asdfgh', autorizatie
 
 console.log('\n--- VALIDARE ---');
 const v1 = valideaza({ nume: 'Cojocaru Daniela', numar_autorizatie: '1010', limbi: ['Engleză'], judet: 'București',
-  localitate: 'București', email: 'Test@Exemplu.RO', consimtamant_prelucrare: true, afisare: 'public' });
+  localitate: 'București', email: 'Test@Exemplu.RO', consimtamant_prelucrare: true, afisare: 'public', parola: 'parola-test-8' });
 console.log((v1.erori.length === 0 ? '  OK   ' : '  PICA ') + 'inscriere valida, email normalizat: ' + v1.date?.email);
 const v2 = valideaza({ nume: 'X', limbi: ['Klingoniană'], email: 'nu', afisare: 'ceva' });
 console.log((v2.erori.length >= 5 ? '  OK   ' : '  PICA ') + 'inscriere invalida, erori: ' + v2.erori.length);
 const v3 = valideaza({ nume: '  Cojocaru   Daniela  ', numar_autorizatie: '1010', limbi: ['Engleză'], judet: 'București',
-  localitate: 'B', email: 'a@b.ro', consimtamant_prelucrare: 'true', afisare: 'public' });
+  localitate: 'B', email: 'a@b.ro', consimtamant_prelucrare: 'true', afisare: 'public', parola: 'parola-test-8' });
 console.log((v3.erori.length === 2 ? '  OK   ' : '  PICA ') + 'consimtamant ca string si localitate scurta, erori: ' + v3.erori.join(' | '));
 
 console.log('\n=========================================');
@@ -84,10 +84,20 @@ console.log(`  ACCEPTAT ${acc}  DE VERIFICAT ${ver}  RESPINS ${res}`);
 console.log('\n--- VARIANTE DE DIACRITICE (trebuie toate acceptate si canonice) ---');
 for (const [l, j] of [['Engleza', 'Bucuresti'], ['ENGLEZĂ', 'BUCUREŞTI'], ['Engleză'.normalize('NFD'), 'București'.normalize('NFD')]]) {
   const v = valideaza({ nume: 'Cojocaru Daniela', numar_autorizatie: '1010', limbi: [l], judet: j,
-    localitate: 'Iași', email: 'a@b.ro', consimtamant_prelucrare: true, afisare: 'public' });
+    localitate: 'Iași', email: 'a@b.ro', consimtamant_prelucrare: true, afisare: 'public', parola: 'parola-test-8' });
   const ok = v.erori.length === 0 && v.date?.limbi[0] === 'Engleză' && v.date?.judet === 'București';
   console.log((ok ? '  OK   ' : '  PICA ') + JSON.stringify(l) + ' / ' + JSON.stringify(j) + ' -> ' + (v.date ? v.date.limbi[0] + ' / ' + v.date.judet : v.erori.join(' ')));
 }
 const vx = valideaza({ nume: 'Cojocaru Daniela', numar_autorizatie: '1010', limbi: ['Klingoniană'], judet: 'Atlantida',
-  localitate: 'Iași', email: 'a@b.ro', consimtamant_prelucrare: true, afisare: 'public' });
+  localitate: 'Iași', email: 'a@b.ro', consimtamant_prelucrare: true, afisare: 'public', parola: 'parola-test-8' });
 console.log((vx.erori.length === 2 ? '  OK   ' : '  PICA ') + 'limba si judet inexistente -> ' + vx.erori.join(' '));
+
+console.log('\n--- PAROLA ---');
+const baza = { nume: 'Cojocaru Daniela', numar_autorizatie: '1010', limbi: ['Engleză'], judet: 'București',
+  localitate: 'București', email: 'a@b.ro', consimtamant_prelucrare: true, afisare: 'public' };
+const p1 = valideaza({ ...baza, parola: 'scurta1' });
+console.log((p1.erori.some(e => /8 caractere/.test(e)) ? '  OK   ' : '  PICA ') + 'parola de 7 caractere -> respinsa');
+const p2 = valideaza({ ...baza, parola: 'o parola buna' });
+console.log((p2.erori.length === 0 && p2.date?.parola === 'o parola buna' ? '  OK   ' : '  PICA ') + 'parola de 13 caractere, cu spatii, pastrata intocmai');
+const p3 = valideaza({ ...baza });
+console.log((p3.erori.some(e => /Parola/.test(e)) ? '  OK   ' : '  PICA ') + 'parola lipsa -> respinsa');
